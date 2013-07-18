@@ -270,6 +270,9 @@ namespace QXcbAtom {
 #if XCB_USE_MAEMO_WINDOW_PROPERTIES
         MeegoTouchOrientationAngle,
 #endif
+#ifdef Q_OS_TIZEN
+        _X_ILLUME_DEACTIVATE_WINDOW,
+#endif
         _XSETTINGS_SETTINGS,
 
         NPredefinedAtoms,

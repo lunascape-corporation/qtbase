@@ -1530,6 +1530,10 @@ void QXcbWindow::handleClientMessageEvent(const xcb_client_message_event_t *even
 #endif
     } else if (event->type == atom(QXcbAtom::_XEMBED)) {
         handleXEmbedMessage(event);
+#ifdef Q_OS_TIZEN
+    } else if (event->type == atom(QXcbAtom::_X_ILLUME_DEACTIVATE_WINDOW)) {
+        QWindowSystemInterface::handleApplicationStateChanged(Qt::ApplicationHidden);
+#endif // Q_OS_TIZEN
     } else {
         qWarning() << "QXcbWindow: Unhandled client message:" << connection()->atomName(event->type);
     }

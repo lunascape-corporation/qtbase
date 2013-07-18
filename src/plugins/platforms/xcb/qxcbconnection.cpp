@@ -1398,6 +1398,9 @@ static const char * xcb_atomnames = {
 #if XCB_USE_MAEMO_WINDOW_PROPERTIES
     "_MEEGOTOUCH_ORIENTATION_ANGLE\0"
 #endif
+#ifdef Q_OS_TIZEN
+    "_X_ILLUME_DEACTIVATE_WINDOW\0"
+#endif
     "_XSETTINGS_SETTINGS\0" // \0\0 terminates loop.
 };
 
