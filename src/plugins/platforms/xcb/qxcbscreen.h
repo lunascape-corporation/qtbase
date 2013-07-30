@@ -52,6 +52,10 @@
 
 #include <private/qfontengine_p.h>
 
+#ifdef Q_OS_TIZEN
+#include <system/sensors.h>
+#endif //Q_OS_TIZEN
+
 QT_BEGIN_NAMESPACE
 
 class QXcbConnection;
@@ -132,6 +136,9 @@ private:
     int m_forcedDpi;
     QFontEngine::HintStyle m_hintStyle;
     QXcbXSettings *m_xSettings;
+#ifdef Q_OS_TIZEN
+    sensor_h m_sensor;
+#endif //Q_OS_TIZEN
 };
 
 QT_END_NAMESPACE

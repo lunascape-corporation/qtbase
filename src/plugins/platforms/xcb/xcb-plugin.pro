@@ -132,4 +132,4 @@ contains(QT_CONFIG, xkbcommon-qt): {
     }
 }
 
-tizen:LIBS += -laul
+tizen:LIBS += -laul -lcapi-system-sensor

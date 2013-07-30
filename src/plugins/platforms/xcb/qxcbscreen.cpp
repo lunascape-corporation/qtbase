@@ -53,6 +53,102 @@
 #include <qpa/qwindowsysteminterface.h>
 #include <private/qmath_p.h>
 
+#ifdef Q_OS_TIZEN
+#include <qdatetime.h>
+
+static uint8_t translateTizenOrientationToXcbRotation(float yaw, float pitch, float roll)
+{
+    int errorThreshold = 20;
+    if (
+        qAbs(pitch - 90) <= errorThreshold &&
+        qAbs(roll)      <= errorThreshold){
+        return XCB_RANDR_ROTATION_ROTATE_90;
+    } else if (qAbs(pitch)     <= errorThreshold &&
+               qAbs(roll - 90) <= errorThreshold) {
+        return XCB_RANDR_ROTATION_ROTATE_0;
+    } else if (qAbs(pitch + 90) <= errorThreshold &&
+               qAbs(roll)       <= errorThreshold){
+        return XCB_RANDR_ROTATION_ROTATE_270;
+    } else if (qAbs(pitch)    <= errorThreshold &&
+               qAbs(roll + 90) <= errorThreshold) {
+        return XCB_RANDR_ROTATION_ROTATE_180;
+    } else {
+        return -1;
+    }
+
+
+}
+
+static uint8_t translateQtOrientationToXcbRotation(Qt::ScreenOrientation orientation)
+{
+    switch (orientation) {
+    case Qt::LandscapeOrientation: // xrandr --rotate normal
+        return XCB_RANDR_ROTATION_ROTATE_0;
+    case Qt::PortraitOrientation: // xrandr --rotate left
+        return XCB_RANDR_ROTATION_ROTATE_90;
+    case Qt::InvertedLandscapeOrientation: // xrandr --rotate inverted
+        return XCB_RANDR_ROTATION_ROTATE_180;
+    case Qt::InvertedPortraitOrientation: // xrandr --rotate right
+        return XCB_RANDR_ROTATION_ROTATE_270;
+    }
+    return XCB_RANDR_ROTATION_ROTATE_90;
+}
+
+
+static void sensor_device_orientation_xcbscreen_cb(unsigned long long timestamp,
+                                         sensor_data_accuracy_e accuracy,
+                                         float yaw, float pitch, float roll,
+                                         void *qXcbScreenHandle)
+{
+    if (accuracy == SENSOR_DATA_ACCURACY_BAD || accuracy == SENSOR_DATA_ACCURACY_UNDEFINED) {
+        qDebug() << "Bad or undefined device orientation sensor data accurancy";
+        return;
+    }
+
+    QXcbScreen *screen = static_cast<QXcbScreen*>(qXcbScreenHandle);
+    if (screen) {
+        xcb_randr_screen_change_notify_event_t e;
+        e.config_timestamp = (xcb_timestamp_t)QDateTime::currentMSecsSinceEpoch();
+        e.rotation = translateTizenOrientationToXcbRotation(yaw,pitch,roll);
+        if (e.rotation == -1)
+            return;
+        e.width = screen->geometry().width();
+        e.height = screen->geometry().height();
+        QDpi dpi = screen->logicalDpi();
+        e.mwidth = dpi.first/Q_MM_PER_INCH/e.width;
+        e.mheight = dpi.second/Q_MM_PER_INCH/e.height;
+        screen->handleScreenChange(&e);
+    } else {
+        qWarning() << "Screen unavailable";
+    }
+
+}
+
+static void tizenSensorPrintWarnings(int errorCode, const char *warningString) {
+    switch (errorCode) {
+        case SENSOR_ERROR_INVALID_PARAMETER:
+            qWarning() << warningString << " Invalid parameter.";
+            break;
+        case SENSOR_ERROR_NOT_SUPPORTED:
+            qWarning() << warningString << " The sensor type is not supported in current device.";
+            break;
+        case SENSOR_ERROR_IO_ERROR:
+            qWarning() << warningString << " I/O error.";
+            break;
+        case SENSOR_ERROR_OPERATION_FAILED:
+            qWarning() << warningString << " Operation failed.";
+            break;
+        case SENSOR_ERROR_OUT_OF_MEMORY:
+            qWarning() << warningString << " Out of memory.";
+            break;
+        default:
+            qWarning() << warningString << " Undefined Error.";
+            break;
+    }
+}
+#endif //Q_OS_TIZEN
+
+
 QT_BEGIN_NAMESPACE
 
 QXcbScreen::QXcbScreen(QXcbConnection *connection, xcb_screen_t *scr,
@@ -70,7 +166,37 @@ QXcbScreen::QXcbScreen(QXcbConnection *connection, xcb_screen_t *scr,
     , m_forcedDpi(-1)
     , m_hintStyle(QFontEngine::HintStyle(-1))
     , m_xSettings(0)
+#ifdef Q_OS_TIZEN
+    ,m_sensor(0)
+#endif
 {
+#ifdef Q_OS_TIZEN
+    {
+        bool isSensorSupported = false;
+        int result;
+        sensor_is_supported(SENSOR_DEVICE_ORIENTATION, &isSensorSupported);
+        if (isSensorSupported) {
+            result = sensor_create(&m_sensor);
+            if (result != SENSOR_ERROR_NONE) {
+                m_sensor = 0;
+                tizenSensorPrintWarnings(result, "Error while creating device orientation sensor:");
+            } else {
+                result = sensor_start(m_sensor, SENSOR_DEVICE_ORIENTATION);
+                if (result != SENSOR_ERROR_NONE) {
+                    tizenSensorPrintWarnings(result, "Error while starting device orientation sensor:");
+                } else {
+                    result = sensor_device_orientation_set_cb(m_sensor, 1000, sensor_device_orientation_xcbscreen_cb, this);
+                    if (result != SENSOR_ERROR_NONE) {
+                        tizenSensorPrintWarnings(result, "Error while registering device orientation sensor callback:");
+                    }
+                }
+            }
+        } else {
+            qWarning() << "Device orientation sensor is not supported. Screen orientation changes can not be handled.";
+        }
+    }
+#endif //Q_OS_TIZEN
+
     if (connection->hasXRandr())
         xcb_randr_select_input(xcb_connection(), screen()->root, true);
 
@@ -192,6 +318,13 @@ QXcbScreen::QXcbScreen(QXcbConnection *connection, xcb_screen_t *scr,
 
 QXcbScreen::~QXcbScreen()
 {
+#ifdef Q_OS_TIZEN
+    if (m_sensor) {
+        int result = sensor_destroy(m_sensor);
+        if (result != SENSOR_ERROR_NONE)
+            tizenSensorPrintWarnings(result, "Error while destroying device orientation sensor:");
+    }
+#endif
     delete m_cursor;
 }
 
