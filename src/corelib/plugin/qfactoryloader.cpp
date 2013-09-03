@@ -56,6 +56,13 @@
 #include "qjsonobject.h"
 #include "qjsonarray.h"
 
+// Modify by Lunascape ------------------------------>
+#include <windows.h>
+#include <shlwapi.h>
+
+#pragma comment(lib, "shlwapi.lib")
+// Modify by Lunascape <------------------------------
+
 QT_BEGIN_NAMESPACE
 
 Q_GLOBAL_STATIC(QList<QFactoryLoader *>, qt_factory_loaders)
@@ -105,13 +112,46 @@ QFactoryLoader::QFactoryLoader(const char *iid,
     qt_factory_loaders()->append(this);
 }
 
+// Modify by Lunascape ------------------------------>
+/*
+* Lunascape: tempフォルダ内のAxWebKit\AxWebKit.iniのパスを取得します。
+*
+*/
+static QString getTempIniPath()
+{
+	wchar_t tmpPath[MAX_PATH];
+	tmpPath[0] = 0;
+	wchar_t iniPath[MAX_PATH];
+	iniPath[0] = 0;
 
+	DWORD ret = ::GetTempPathW(MAX_PATH, tmpPath);
+	if (ret != 0)
+	{
+		wchar_t folderPath[MAX_PATH];
+		::PathCombine(folderPath, tmpPath, TEXT("AxWebKit"));
+		if (!::PathFileExistsW(folderPath))
+		{
+			::CreateDirectory(folderPath, NULL);
+		}
+
+		::PathCombine(iniPath, folderPath, TEXT("AxWebKit.ini"));
+	}
+
+	QString strRet = QString::fromWCharArray(iniPath);
+	return strRet;
+}
+// Modify by Lunascape <------------------------------
 
 void QFactoryLoader::update()
 {
 #ifdef QT_SHARED
     Q_D(QFactoryLoader);
     QStringList paths = QCoreApplication::libraryPaths();
+	// Modify by Lunascape ------------------------------>
+	// Lunascape: レジストリではなくtempフォルダ内のAxWebKit\AxWebKit.iniに書き込み
+	QString strIniPath = getTempIniPath();
+    QSettings settings(strIniPath, QSettings::IniFormat);
+	// Modify by Lunascape <------------------------------
     for (int i = 0; i < paths.count(); ++i) {
         const QString &pluginDir = paths.at(i);
         // Already loaded, skip it...
