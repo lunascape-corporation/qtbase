@@ -139,9 +139,12 @@ static PtrGetThemePropertyOrigin pGetThemePropertyOrigin = 0;
 */
 bool QWindowsVistaStylePrivate::useVista()
 {
-    return (QWindowsVistaStylePrivate::useXP() &&
+	// Modify by Lunascape ------------------------------>
+	return false;
+    /*return (QWindowsVistaStylePrivate::useXP() &&
             (QSysInfo::WindowsVersion >= QSysInfo::WV_VISTA &&
-             (QSysInfo::WindowsVersion & QSysInfo::WV_NT_based)));
+             (QSysInfo::WindowsVersion & QSysInfo::WV_NT_based)));*/
+	// Modify by Lunascape <------------------------------
 }
 
 /* \internal

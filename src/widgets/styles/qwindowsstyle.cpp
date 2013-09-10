@@ -1506,7 +1506,10 @@ void QWindowsStyle::drawControl(ControlElement ce, const QStyleOption *opt, QPai
             QBrush bg = p->background();
             Qt::BGMode bg_mode = p->backgroundMode();
             p->setPen(Qt::NoPen);
-            p->setBackgroundMode(Qt::OpaqueMode);
+			// Modify by Lunascape ------------------------------>
+            //p->setBackgroundMode(Qt::OpaqueMode);
+            p->setBackgroundMode(Qt::TransparentMode);
+			// Modify by Lunascape <------------------------------
 
             if (opt->state & State_Sunken) {
                 br = QBrush(opt->palette.shadow().color(), Qt::Dense4Pattern);
