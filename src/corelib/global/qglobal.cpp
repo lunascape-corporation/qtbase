@@ -76,6 +76,10 @@
 #include <CoreServices/CoreServices.h>
 #endif
 
+#if defined(Q_OS_ANDROID)
+#include <private/qjni_p.h>
+#endif
+
 QT_BEGIN_NAMESPACE
 
 #if !QT_DEPRECATED_SINCE(5, 0)
@@ -83,6 +87,14 @@ QT_BEGIN_NAMESPACE
 Q_CORE_EXPORT void *qMemCopy(void *dest, const void *src, size_t n);
 Q_CORE_EXPORT void *qMemSet(void *dest, int c, size_t n);
 #endif
+
+// Statically check assumptions about the environment we're running
+// in. The idea here is to error or warn if otherwise implicit Qt
+// assumptions are not fulfilled on new hardware or compilers
+// (if this list becomes too long, consider factoring into a separate file)
+Q_STATIC_ASSERT_X(sizeof(int) == 4, "Qt assumes that int is 32 bits");
+Q_STATIC_ASSERT_X(UCHAR_MAX == 255, "Qt assumes that char is 8 bits");
+
 
 /*!
     \class QFlag
@@ -346,15 +358,15 @@ Q_CORE_EXPORT void *qMemSet(void *dest, int c, size_t n);
 /*!
     \fn bool QFlags::operator!() const
 
-    Returns true if no flag is set (i.e., if the value stored by the
-    QFlags object is 0); otherwise returns false.
+    Returns \c true if no flag is set (i.e., if the value stored by the
+    QFlags object is 0); otherwise returns \c false.
 */
 
 /*!
     \fn bool QFlags::testFlag(Enum flag) const
     \since 4.2
 
-    Returns true if the \a flag is set, otherwise false.
+    Returns \c true if the \a flag is set, otherwise false.
 */
 
 /*!
@@ -934,7 +946,7 @@ bool qSharedBuild() Q_DECL_NOTHROW
     \endlist
 
     Some constants are defined only on certain platforms. You can use
-    the preprocessor symbols Q_OS_WIN and Q_OS_MACX to test that
+    the preprocessor symbols Q_OS_WIN and Q_OS_OSX to test that
     the application is compiled under Windows or OS X.
 
     \sa QLibraryInfo
@@ -1010,6 +1022,7 @@ bool qSharedBuild() Q_DECL_NOTHROW
     \value WV_VISTA Windows Vista, Windows Server 2008 (operating system version 6.0)
     \value WV_WINDOWS7 Windows 7, Windows Server 2008 R2 (operating system version 6.1)
     \value WV_WINDOWS8 Windows 8 (operating system version 6.2)
+    \value WV_WINDOWS8_1 Windows 8.1 (operating system version 6.3), introduced in Qt 5.2
 
     Alternatively, you may use the following macros which correspond directly to the Windows operating system version number:
 
@@ -1020,6 +1033,7 @@ bool qSharedBuild() Q_DECL_NOTHROW
     \value WV_6_0   Operating system version 6.0, corresponds to Windows Vista and Windows Server 2008
     \value WV_6_1   Operating system version 6.1, corresponds to Windows 7 and Windows Server 2008 R2
     \value WV_6_2   Operating system version 6.2, corresponds to Windows 8
+    \value WV_6_3   Operating system version 6.3, corresponds to Windows 8.1, introduced in Qt 5.2
 
     CE-based versions:
 
@@ -1077,18 +1091,20 @@ bool qSharedBuild() Q_DECL_NOTHROW
     \macro Q_OS_DARWIN
     \relates <QtGlobal>
 
-    Defined on Darwin OS (synonym for Q_OS_MAC).
+    Defined on Darwin-based operating systems such as OS X and iOS,
+    including any open source version(s) of Darwin.
 */
 
 /*!
     \macro Q_OS_MAC
     \relates <QtGlobal>
 
-    Defined on OS X and iOS (synonym for Q_OS_DARWIN).
+    Defined on Darwin-based operating systems distributed by Apple, which
+    currently includes OS X and iOS, but not the open source version.
  */
 
 /*!
-    \macro Q_OS_MACX
+    \macro Q_OS_OSX
     \relates <QtGlobal>
 
     Defined on OS X.
@@ -1131,6 +1147,21 @@ bool qSharedBuild() Q_DECL_NOTHROW
 */
 
 /*!
+    \macro Q_OS_WINRT
+    \relates <QtGlobal>
+
+    Defined for Windows Runtime (Windows Store apps) on Windows 8, Windows RT,
+    and Windows Phone 8.
+*/
+
+/*!
+    \macro Q_OS_WINPHONE
+    \relates <QtGlobal>
+
+    Defined on Windows Phone 8.
+*/
+
+/*!
     \macro Q_OS_CYGWIN
     \relates <QtGlobal>
 
@@ -1163,6 +1194,13 @@ bool qSharedBuild() Q_DECL_NOTHROW
     \relates <QtGlobal>
 
     Defined on Linux.
+*/
+
+/*!
+    \macro Q_OS_ANDROID
+    \relates <QtGlobal>
+
+    Defined on Android.
 */
 
 /*!
@@ -1706,11 +1744,43 @@ QSysInfo::MacVersion QSysInfo::macVersion()
 }
 const QSysInfo::MacVersion QSysInfo::MacintoshVersion = QSysInfo::macVersion();
 
-#elif defined(Q_OS_WIN) || defined(Q_OS_CYGWIN) || defined(Q_OS_WINCE)
+#elif defined(Q_OS_WIN) || defined(Q_OS_CYGWIN) || defined(Q_OS_WINCE) || defined(Q_OS_WINRT)
 
 QT_BEGIN_INCLUDE_NAMESPACE
 #include "qt_windows.h"
 QT_END_INCLUDE_NAMESPACE
+
+#ifndef Q_OS_WINRT
+static inline OSVERSIONINFO winOsVersion()
+{
+    OSVERSIONINFO result = { sizeof(OSVERSIONINFO), 0, 0, 0, 0, {'\0'}};
+    // GetVersionEx() has been deprecated in Windows 8.1 and will return
+    // only Windows 8 from that version on.
+#  if defined(_MSC_VER) && _MSC_VER >= 1800
+#    pragma warning( push )
+#    pragma warning( disable : 4996 )
+#  endif
+    GetVersionEx(&result);
+#  if defined(_MSC_VER) && _MSC_VER >= 1800
+#    pragma warning( pop )
+#  endif
+#  ifndef Q_OS_WINCE
+    if (result.dwMajorVersion == 6 && result.dwMinorVersion == 2) {
+        // This could be Windows 8.1 or higher. Note that as of Windows 9,
+        // the major version needs to be checked as well.
+        DWORDLONG conditionMask = 0;
+        VER_SET_CONDITION(conditionMask, VER_MAJORVERSION, VER_GREATER_EQUAL);
+        VER_SET_CONDITION(conditionMask, VER_MINORVERSION, VER_GREATER_EQUAL);
+        VER_SET_CONDITION(conditionMask, VER_PLATFORMID, VER_EQUAL);
+        OSVERSIONINFOEX checkVersion = { sizeof(OSVERSIONINFOEX), result.dwMajorVersion, result.dwMinorVersion,
+                                         result.dwBuildNumber, result.dwPlatformId, {'\0'}, 0, 0, 0, 0, 0 };
+        for ( ; VerifyVersionInfo(&checkVersion, VER_MAJORVERSION | VER_MINORVERSION | VER_PLATFORMID, conditionMask); ++checkVersion.dwMinorVersion)
+            result.dwMinorVersion = checkVersion.dwMinorVersion;
+    }
+#  endif // !Q_OS_WINCE
+    return result;
+}
+#endif // !Q_OS_WINRT
 
 QSysInfo::WinVersion QSysInfo::windowsVersion()
 {
@@ -1730,10 +1800,11 @@ QSysInfo::WinVersion QSysInfo::windowsVersion()
     static QSysInfo::WinVersion winver;
     if (winver)
         return winver;
+#ifdef Q_OS_WINRT
+    winver = QSysInfo::WV_WINDOWS8;
+#else
     winver = QSysInfo::WV_NT;
-    OSVERSIONINFO osver;
-    osver.dwOSVersionInfoSize = sizeof(osver);
-    GetVersionEx(&osver);
+    const OSVERSIONINFO osver = winOsVersion();
 #ifdef Q_OS_WINCE
     DWORD qt_cever = 0;
     qt_cever = osver.dwMajorVersion * 100;
@@ -1779,6 +1850,8 @@ QSysInfo::WinVersion QSysInfo::windowsVersion()
             winver = QSysInfo::WV_WINDOWS7;
         } else if (osver.dwMajorVersion == 6 && osver.dwMinorVersion == 2) {
             winver = QSysInfo::WV_WINDOWS8;
+        } else if (osver.dwMajorVersion == 6 && osver.dwMinorVersion == 3) {
+            winver = QSysInfo::WV_WINDOWS8_1;
         } else {
             qWarning("Qt: Untested Windows version %d.%d detected!",
                      int(osver.dwMajorVersion), int(osver.dwMinorVersion));
@@ -1814,6 +1887,7 @@ QSysInfo::WinVersion QSysInfo::windowsVersion()
             winver = QSysInfo::WV_WINDOWS8;
     }
 #endif
+#endif // !Q_OS_WINRT
 
     return winver;
 }
@@ -2263,7 +2337,7 @@ bool qputenv(const char *varName, const QByteArray& value)
 
     This function deletes the variable \a varName from the environment.
 
-    Returns true on success.
+    Returns \c true on success.
 
     \since 5.1
 
@@ -2291,7 +2365,7 @@ bool qunsetenv(const char *varName)
 #endif
 }
 
-#if defined(Q_OS_UNIX) && !defined(QT_NO_THREAD)
+#if defined(Q_OS_UNIX) && !defined(QT_NO_THREAD) && defined(_POSIX_THREAD_SAFE_FUNCTIONS) && (_POSIX_THREAD_SAFE_FUNCTIONS - 0 > 0)
 
 #  if defined(Q_OS_INTEGRITY) && defined(__GHS_VERSION_NUMBER) && (__GHS_VERSION_NUMBER < 500)
 // older versions of INTEGRITY used a long instead of a uint for the seed.
@@ -2303,6 +2377,9 @@ typedef uint SeedStorageType;
 typedef QThreadStorage<SeedStorageType *> SeedStorage;
 Q_GLOBAL_STATIC(SeedStorage, randTLS)  // Thread Local Storage for seed value
 
+#elif defined(Q_OS_ANDROID)
+typedef QThreadStorage<QJNIObjectPrivate> AndroidRandomStorage;
+Q_GLOBAL_STATIC(AndroidRandomStorage, randomTLS)
 #endif
 
 /*!
@@ -2336,6 +2413,21 @@ void qsrand(uint seed)
         //global static object, fallback to srand(seed)
         srand(seed);
     }
+#elif defined(Q_OS_ANDROID)
+    if (randomTLS->hasLocalData()) {
+        randomTLS->localData().callMethod<void>("setSeed", "(J)V", jlong(seed));
+        return;
+    }
+
+    QJNIObjectPrivate random("java/util/Random",
+                             "(J)V",
+                             jlong(seed));
+    if (!random.isValid()) {
+        srand(seed);
+        return;
+    }
+
+    randomTLS->setLocalData(random);
 #else
     // On Windows srand() and rand() already use Thread-Local-Storage
     // to store the seed between calls
@@ -2377,6 +2469,26 @@ int qrand()
         //global static object, fallback to rand()
         return rand();
     }
+#elif defined(Q_OS_ANDROID)
+    AndroidRandomStorage *randomStorage = randomTLS();
+    if (!randomStorage)
+        return rand();
+
+    if (randomStorage->hasLocalData()) {
+        return randomStorage->localData().callMethod<jint>("nextInt",
+                                                           "(I)I",
+                                                           RAND_MAX);
+    }
+
+    QJNIObjectPrivate random("java/util/Random",
+                             "(J)V",
+                             jlong(1));
+
+    if (!random.isValid())
+        return rand();
+
+    randomStorage->setLocalData(random);
+    return random.callMethod<jint>("nextInt", "(I)I", RAND_MAX);
 #else
     // On Windows srand() and rand() already use Thread-Local-Storage
     // to store the seed between calls
@@ -3331,6 +3443,38 @@ bool QInternal::activateCallbacks(Callback cb, void **parameters)
     \endcode
 
     \sa Q_DECL_OVERRIDE
+*/
+
+/*!
+    \macro Q_FORWARD_DECLARE_OBJC_CLASS(classname)
+    \since 5.2
+    \relates <QtGlobal>
+
+    Forward-declares an Objective-C \a classname in a manner such that it can be
+    compiled as either Objective-C or C++.
+
+    This is primarily intended for use in header files that may be included by
+    both Objective-C and C++ source files.
+*/
+
+/*!
+    \macro Q_FORWARD_DECLARE_CF_TYPE(type)
+    \since 5.2
+    \relates <QtGlobal>
+
+    Forward-declares a Core Foundation \a type. This includes the actual
+    type and the ref type. For example, Q_FORWARD_DECLARE_CF_TYPE(CFString)
+    declares __CFString and CFStringRef.
+*/
+
+/*!
+    \macro Q_FORWARD_DECLARE_MUTABLE_CF_TYPE(type)
+    \since 5.2
+    \relates <QtGlobal>
+
+    Forward-declares a mutable Core Foundation \a type. This includes the actual
+    type and the ref type. For example, Q_FORWARD_DECLARE_CF_TYPE(CFString)
+    declares __CFMutableString and CFMutableStringRef.
 */
 
 QT_END_NAMESPACE

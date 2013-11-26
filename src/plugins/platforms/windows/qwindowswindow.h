@@ -221,6 +221,7 @@ public:
     void handleMoved();
     void handleResized(int wParam);
     void handleHidden();
+    void handleCompositionSettingsChanged();
 
     static inline HWND handleOf(const QWindow *w);
     static inline QWindowsWindow *baseWindowOf(const QWindow *w);
@@ -229,6 +230,7 @@ public:
     static inline void setUserDataOf(HWND hwnd, void *ud);
 
     static bool setWindowLayered(HWND hwnd, Qt::WindowFlags flags, bool hasAlpha, qreal opacity);
+    bool isLayered() const;
 
     HDC getDC();
     void releaseDC();
@@ -373,6 +375,15 @@ inline void QWindowsWindow::destroyIcon()
         DestroyIcon(m_iconSmall);
         m_iconSmall = 0;
     }
+}
+
+inline bool QWindowsWindow::isLayered() const
+{
+#ifndef Q_OS_WINCE
+    return GetWindowLongPtr(m_data.hwnd, GWL_EXSTYLE) & WS_EX_LAYERED;
+#else
+    return false;
+#endif
 }
 
 QT_END_NAMESPACE

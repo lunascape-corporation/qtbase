@@ -70,6 +70,8 @@ QT_BEGIN_NAMESPACE
     it has been created from as long as it is not being modified.
 
     You can convert the object to and from text based JSON through QJsonDocument.
+
+    \sa {JSON Support in Qt}, {JSON Save Game Example}
 */
 
 /*!
@@ -604,7 +606,7 @@ QJsonObject::const_iterator QJsonObject::constFind(const QString &key) const
     Multiple iterators can be used on the same object. Existing iterators will however
     become dangling once the object gets modified.
 
-    \sa QJsonObject::const_iterator
+    \sa QJsonObject::const_iterator, {JSON Support in Qt}, {JSON Save Game Example}
 */
 
 /*! \typedef QJsonObject::iterator::difference_type
@@ -799,7 +801,7 @@ QJsonObject::const_iterator QJsonObject::constFind(const QString &key) const
     Multiple iterators can be used on the same object. Existing iterators
     will however become dangling if the object gets modified.
 
-    \sa QJsonObject::iterator
+    \sa QJsonObject::iterator, {JSON Support in Qt}, {JSON Save Game Example}
 */
 
 /*! \typedef QJsonObject::const_iterator::difference_type
@@ -1034,7 +1036,7 @@ void QJsonObject::setValueAt(int i, const QJsonValue &val)
     insert(e->key(), val);
 }
 
-#ifndef QT_NO_DEBUG_STREAM
+#if !defined(QT_NO_DEBUG_STREAM) && !defined(QT_JSON_READONLY)
 QDebug operator<<(QDebug dbg, const QJsonObject &o)
 {
     if (!o.o) {

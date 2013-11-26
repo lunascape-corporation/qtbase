@@ -47,7 +47,8 @@
 #ifndef QT_NO_CONCURRENT
 
 #include <QtCore/qvector.h>
-#include <QtCore/qalgorithms.h>
+
+#include <algorithm>
 
 QT_BEGIN_NAMESPACE
 
@@ -101,9 +102,10 @@ public:
     {
         if (dirty) {
             dirty = false;
-            QVector<T> sorted = values;
-            qSort(sorted);
-            currentMedian = sorted.at(bufferSize / 2 + 1);
+            QVector<T> copy = values;
+            typename QVector<T>::iterator begin = copy.begin(), mid = copy.begin() + bufferSize/2, end = copy.end();
+            std::nth_element(begin, mid, end);
+            currentMedian = *mid;
         }
         return currentMedian;
     }

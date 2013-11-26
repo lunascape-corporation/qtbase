@@ -357,8 +357,8 @@ void tst_QHeaderView::getSetCheck()
     QVERIFY(obj1.defaultSectionSize() >= 0);
     obj1.setDefaultSectionSize(0);
     QCOMPARE(0, obj1.defaultSectionSize());
-    obj1.setDefaultSectionSize(INT_MAX);
-    QCOMPARE(INT_MAX, obj1.defaultSectionSize());
+    obj1.setDefaultSectionSize(99999);
+    QCOMPARE(99999, obj1.defaultSectionSize());
 
     // int QHeaderView::minimumSectionSize()
     // void QHeaderView::setMinimumSectionSize(int)
@@ -366,8 +366,10 @@ void tst_QHeaderView::getSetCheck()
     QVERIFY(obj1.minimumSectionSize() >= 0);
     obj1.setMinimumSectionSize(0);
     QCOMPARE(0, obj1.minimumSectionSize());
-    obj1.setMinimumSectionSize(INT_MAX);
-    QCOMPARE(INT_MAX, obj1.minimumSectionSize());
+    obj1.setMinimumSectionSize(99999);
+    QCOMPARE(99999, obj1.minimumSectionSize());
+    obj1.setMinimumSectionSize(-1);
+    QVERIFY(obj1.minimumSectionSize() < 100);
 
     // int QHeaderView::offset()
     // void QHeaderView::setOffset(int)
@@ -2720,6 +2722,20 @@ void tst_QHeaderView::resizeToContentTest()
     view->resizeSections(QHeaderView::ResizeToContents);
     QVERIFY(view->sectionSize(1) > 1);
     QVERIFY(view->sectionSize(2) > 1);
+
+    // Check minimum section size
+    hh->setMinimumSectionSize(150);
+    model->setData(idx, QVariant("i"));
+    hh->resizeSections(QHeaderView::ResizeToContents);
+    QCOMPARE(hh->sectionSize(3), 150);
+    hh->setMinimumSectionSize(-1);
+
+    // Check maximumSection size
+    hh->setMaximumSectionSize(200);
+    model->setData(idx, QVariant("This is a even longer string that is expected to be more than 200 pixels"));
+    hh->resizeSections(QHeaderView::ResizeToContents);
+    QCOMPARE(hh->sectionSize(3), 200);
+    hh->setMaximumSectionSize(-1);
 
     view->setDefaultSectionSize(25); // To make sure our precalced data are correct. We do not know font height etc.
 

@@ -1,0 +1,180 @@
+Qt 5.2 introduces many new features and improvements as well as bugfixes
+over the 5.1.x series. For more details, refer to the online documentation
+included in this distribution. The documentation is also available online:
+
+  http://qt-project.org/doc/qt-5.2
+
+The Qt version 5.2 series is binary compatible with the 5.1.x series.
+Applications compiled for 5.1 will continue to run with 5.2.
+
+Some of the changes listed in this file include issue tracking numbers
+corresponding to tasks in the Qt Bug Tracker:
+
+  http://bugreports.qt-project.org/
+
+Each of these identifiers can be entered in the bug tracker to obtain more
+information about a particular change.
+
+****************************************************************************
+*                     Architecture Specific Changes                        *
+****************************************************************************
+
+Qt is now compiled with qreal typedef'ed to double on all platforms. qreal
+was a float on ARM chipsets before. This guarantees more consistent behavior
+between all platforms Qt supports, but is binary incompatible to Qt 5.1
+on ARM. The old behavior can be restored by passing -qreal float to
+configure.
+
+****************************************************************************
+*                          Library                                         *
+****************************************************************************
+
+
+QtWidgets
+---------
+
+- QAbstractScrollArea now has a SizeAdjustPolicy. If it is set to AdjustToContents
+  it will make use of the protected viewportSizeHint() virtual function. This
+  function returns a suggested size based on contents. Note that although the
+  viewportSizeHint() virtual function was reserved in 5.0, user code was not
+  supposed to be overriding it (as the function was private and undocumented).
+  Code that was overriding viewportSizeHint() needs to be recompiled against 5.2
+  for this feature to work correctly.
+
+- QTreeView now has setTreePosition to allow the treestructure to show data from other
+  columns than logicalindex zero.
+
+- [QTBUG-4206] QTableView resizeToContents will now adjust to actual contents
+  and not just visible area. QHeaderView::setAutoResizePrecision() has been
+  introduced to control how precise the autoResize should be.
+
+- QFileDialog::setDefaultSuffix() removes leading dot characters.
+
+- [QTBUG-34132] QFileDialog does not instantiate widgets if a native dialog
+  will be used instead.  Therefore some accessors which previously returned
+  unused objects will now return null.  As before, you can set the
+  DontUseNativeDialog option to ensure that widgets will be created and used instead.
+
+- QSizePolicy got a retainSizeWhenHidden attribute.
+
+- [QTBUG-31602] QSpinBox size calculation will now be fixed when stylesheets are
+  used.
+
+QtCore
+------
+- [QTBUG-30250] QTime, QDateTime:
+  When calling QTime::toString(Qt::TextDate) and QTime::toString(Qt::ISODate),
+  milliseconds are now included in the returned string. This also applies to
+  QDateTime::toString(Qt::TextDate) and QDateTime::toString(ISODate).
+
+- QtAlgorithms
+  With STL no longer being optional for building and using Qt, a number of parts
+  of QtAlgorithms no longer make sense, and have therefore been deprecated.
+
+  Replacements are available in the STL, and generally have much better
+  performance, but are not instantly source-compatible in all cases. For
+  instance, specialization of qLess or qSwap means that a direct port to
+  std::sort from qSort may not be possible, as std::sort does not use any of
+  them; a possible workaround is explicitly passing a qLess functor to
+  std::sort:
+
+      std::sort(container.begin(), container.end(), qLess<T>());
+
+  The functions in QtAlgorithms that have been deprecated, along with their
+  STL counterparts, are:
+    - qBinaryFind (std::binary_search / std::lower_bound)
+    - qCopy (std::copy)
+    - qCopyBackward (std::copy_backward)
+    - qEqual (std::equal)
+    - qFill (std::fill)
+    - qFind (std::find)
+    - qCount (std::count)
+    - qSort (std::sort)
+    - qStableSort (std::stable_sort)
+    - qLowerBound (std::lower_bound)
+    - qUpperBound (std::upper_bound)
+    - qLess (std::less)
+    - qGreater (std::greater)
+
+QtGui
+-----
+- [QTBUG-28228] Session Management:
+  The new QPlatformSessionManager class brings back the session management
+  functionality. It allows the implementation of platform specific behavior
+  related to session management. For platform that don't support this
+  feature the default behavior has not changed.
+  Both X11 and Windows session management are supported.
+
+QtNetwork
+---------
+
+- API was added to store and resume TLS session tickets.
+
+- The minimum support openssl version has been increased to openssl 1.0. The
+  code to support older versions has not been removed, but is no longer
+  supported.
+
+- An off-by-one error in NTLM proxy authentication has been fixed.
+
+- Various improvements to reduce the memory used by qtnetwork have been made.
+
+- Improved support for HTTP proxy authentication.
+
+- Support for preconnecting to servers before making HTTP and HTTPS
+  connections. This allows for much reduced latency when the hosts to be
+  connected to are known.
+
+QtSql
+-----
+Changes in Qt 5.1.0 (missing from released changelog dist/changes-5.1.0)
+- [QTBUG-28088] Remove dependency of DB driver headers on qsqlcachedresult_p.h.
+- Deprecate QSqlError setters.
+  The constructor is sufficient, since it has a parameter for each member variable.
+- Rename the SQL driver header files to _p.h (make private)
+  The drivers were never public API. They were exposed by mistake in
+  public headers. What's more, they have #include'd a private header
+  (qsqlcachedresult_p.h) since at least Qt 4.5.1. That means no one used
+  those headers in Qt 4 (private headers weren't installed then) and
+  it's unlikely anyone did in 5.0.
+- ODBC: Implemented lastInsertId() for some ODBC compatible databases.
+- PSQL: Make lastInsertID work for tables without OIDs.
+- [QTBUG-14904] SQLITE: Fix for Sql query aliases with dots
+- [QTBUG-2192] ODBC: fix loss of milliseconds when binding QDateTime
+- [QTBUG-30076] PSQL: escape backslashes only when server requires it
+  IMPORTANT: Applications that implemented their own workarounds must be
+  updated to avoid misbehavior and SQL injection vulnerabilities.
+- [QTBUG-10569] ODBC: fixed QODBCResult::exec() return value for DELETE
+  operations when no rows are affected.
+- ODBC: Fixed loss of column metadata on SQL_NO_DATA.
+- QSqlTableModel: expose methods for getting primary values.
+- ODBC: Fixed possible cause of spurious errors (commit af35ee291a1bbbc8)
+
+Changes in Qt 5.2.0
+- [QTBUG-29261] IBASE: Construct a valid QTime when creating timestamps for iBase SQL driver.
+- [QTBUG-33389] PSQL: Format QDateTime following ISO8601.
+- Add QSQLITE_OPEN_URI option to QSQLITE driver
+
+****************************************************************************
+*                      Platform Specific Changes                           *
+****************************************************************************
+
+
+Qt for Windows
+--------------
+ - QCoreApplication::arguments() changed the handling of single quotes, double quotes
+   and the backslash character, in order to match what argv[] contains.
+   In particular, single quotes are no longer removed from the argument string.
+   (QTBUG-15379, QTBUG-30628)
+
+Qt for Android
+--------------
+ - Project structure and deployment has changed with the introduction of
+   androiddeployqt. Source and build files are no longer mixed, and the
+   build files for the APK package should not be touched. Customizing
+   the build files is possible. Read the documentation for androiddeployqt
+   for more information.
+
+ - Status bar visibility is now controlled by Qt, so the window state will
+   override settings in the AndroidManifest.xml. The default is still to
+   show the status bar (QWindow::showMaximized()). Use
+   QWindow::showFullScreen() to hide it.

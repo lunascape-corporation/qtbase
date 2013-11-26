@@ -61,7 +61,7 @@ QT_FORWARD_DECLARE_CLASS(QCocoaWindow)
 @end
 
 @interface QNSPanel : NSPanel {
-    @public QT_PREPEND_NAMESPACE(QCocoaWindow) *m_cocoaPlatformWindow;
+    @public QCocoaWindow *m_cocoaPlatformWindow;
 }
 - (void)clearPlatformWindow;
 - (BOOL)canBecomeKeyWindow;
@@ -154,6 +154,8 @@ public:
     void setMenubar(QCocoaMenuBar *mb);
     QCocoaMenuBar *menubar() const;
 
+    void setWindowCursor(NSCursor *cursor);
+
     void registerTouch(bool enable);
 
     qreal devicePixelRatio() const;
@@ -190,19 +192,24 @@ public: // for QNSView
     Qt::WindowState m_synchedWindowState;
     Qt::WindowModality m_windowModality;
     QPointer<QWindow> m_activePopupWindow;
-    QPointer<QWindow> m_underMouseWindow;
+    QPointer<QWindow> m_enterLeaveTargetWindow;
+    bool m_windowUnderMouse;
 
     bool m_inConstructor;
     QCocoaGLContext *m_glContext;
     QCocoaMenuBar *m_menubar;
+    NSCursor *m_windowCursor;
 
     bool m_hasModalSession;
     bool m_frameStrutEventsEnabled;
     bool m_isExposed;
     int m_registerTouchCount;
+    bool m_resizableTransientParent;
+    bool m_overrideBecomeKey;
 
     static const int NoAlertRequest;
     NSInteger m_alertRequest;
+    id monitor;
 };
 
 QT_END_NAMESPACE

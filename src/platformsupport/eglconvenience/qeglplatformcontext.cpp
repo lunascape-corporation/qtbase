@@ -49,14 +49,23 @@
 
 static inline void bindApi(const QSurfaceFormat &format)
 {
-    if (format.renderableType() == QSurfaceFormat::OpenVG)
+    switch (format.renderableType()) {
+    case QSurfaceFormat::OpenVG:
         eglBindAPI(EGL_OPENVG_API);
+        break;
 #ifdef EGL_VERSION_1_4
-    else if (format.renderableType() == QSurfaceFormat::OpenGL)
+#  if !defined(QT_OPENGL_ES_2)
+    case QSurfaceFormat::DefaultRenderableType:
+#  endif
+    case QSurfaceFormat::OpenGL:
         eglBindAPI(EGL_OPENGL_API);
+        break;
 #endif
-    else
+    case QSurfaceFormat::OpenGLES:
+    default:
         eglBindAPI(EGL_OPENGL_ES_API);
+        break;
+    }
 }
 
 QEGLPlatformContext::QEGLPlatformContext(const QSurfaceFormat &format, QPlatformOpenGLContext *share, EGLDisplay display,
@@ -105,6 +114,14 @@ bool QEGLPlatformContext::makeCurrent(QPlatformSurface *surface)
     bindApi(m_format);
 
     EGLSurface eglSurface = eglSurfaceForPlatformSurface(surface);
+
+    // shortcut: on some GPUs, eglMakeCurrent is not a cheap operation
+    if (eglGetCurrentContext() == m_eglContext &&
+        eglGetCurrentDisplay() == m_eglDisplay &&
+        eglGetCurrentSurface(EGL_READ) == eglSurface &&
+        eglGetCurrentSurface(EGL_DRAW) == eglSurface) {
+        return true;
+    }
 
     bool ok = eglMakeCurrent(m_eglDisplay, eglSurface, eglSurface, m_eglContext);
     if (!ok)

@@ -80,19 +80,8 @@ UnixMakefileGenerator::writeMakefile(QTextStream &t)
 {
 
     writeHeader(t);
-    if(!project->values("QMAKE_FAILED_REQUIREMENTS").isEmpty()) {
-        t << "QMAKE    = " << var("QMAKE_QMAKE") << endl;
-        const ProStringList &qut = project->values("QMAKE_EXTRA_TARGETS");
-        for (ProStringList::ConstIterator it = qut.begin(); it != qut.end(); ++it)
-            t << *it << " ";
-        t << "first all clean install distclean uninstall qmake_all:\n\t"
-          << "@echo \"Some of the required modules ("
-          << var("QMAKE_FAILED_REQUIREMENTS") << ") are not available.\"\n\t"
-          << "@echo \"Skipped.\"\n\n";
-        writeMakeQmake(t);
-        t << "FORCE:\n\n";
+    if (writeDummyMakefile(t))
         return true;
-    }
 
     if (project->values("TEMPLATE").first() == "app" ||
         project->values("TEMPLATE").first() == "lib" ||
@@ -296,13 +285,13 @@ UnixMakefileGenerator::writeMakeParts(QTextStream &t)
             t << odir << ".deps/%.d: " << pwd << "/%.cpp\n\t";
             if(project->isActiveConfig("echo_depend_creation"))
                 t << "@echo Creating depend for $<\n\t";
-            t << mkdir_p_asstring("$(@D)") << "\n\t"
+            t << mkdir_p_asstring("$(@D)", false) << "\n\t"
               << "@$(CXX) " << cmd << " $< | sed \"s,^\\($(*F).o\\):," << odir << "\\1:,g\" >$@\n\n";
 
             t << odir << ".deps/%.d: " << pwd << "/%.c\n\t";
             if(project->isActiveConfig("echo_depend_creation"))
                 t << "@echo Creating depend for $<\n\t";
-            t << mkdir_p_asstring("$(@D)") << "\n\t"
+            t << mkdir_p_asstring("$(@D)", false) << "\n\t"
               << "@$(CC) " << cmd << " $< | sed \"s,^\\($(*F).o\\):," << odir << "\\1:,g\" >$@\n\n";
 
             static const char * const src[] = { "SOURCES", "GENERATED_SOURCES", 0 };
@@ -815,7 +804,7 @@ UnixMakefileGenerator::writeMakeParts(QTextStream &t)
                                                 project->first("OBJECTS_DIR")) + ddir,
                                                Option::output_dir, Option::output_dir));
     t << "dist: \n\t"
-      << mkdir_p_asstring(ddir_c) << "\n\t"
+      << mkdir_p_asstring(ddir_c, false) << "\n\t"
       << "$(COPY_FILE) --parents $(SOURCES) $(DIST) " << ddir_c << Option::dir_sep << " && ";
     if(!project->isEmpty("QMAKE_EXTRA_COMPILERS")) {
         const ProStringList &quc = project->values("QMAKE_EXTRA_COMPILERS");
@@ -931,7 +920,7 @@ UnixMakefileGenerator::writeMakeParts(QTextStream &t)
         t << "\t-$(DEL_FILE) " << destdir << "$(TARGET0) " << destdir << "$(TARGET1) "
           << destdir << "$(TARGET2) $(TARGETA)\n";
     } else {
-        t << "\t-$(DEL_FILE) $(TARGET) \n";
+        t << "\t-$(DEL_FILE) " << destdir << "$(TARGET) \n";
     }
     t << varGlue("QMAKE_DISTCLEAN","\t-$(DEL_FILE) "," ","\n");
     {
@@ -1277,6 +1266,8 @@ void UnixMakefileGenerator::init2()
                         alldeps += path + Option::dir_sep + fileInfo(files[file].toQString()).fileName();
                 }
             }
+        } else {
+            warn_msg(WarnLogic, "Could not resolve Info.plist: '%s'. Check if QMAKE_INFO_PLIST points to a valid file.", plist.toLatin1().constData());
         }
     }
 }

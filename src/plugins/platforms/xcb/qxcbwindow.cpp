@@ -57,6 +57,8 @@
 
 #include <qpa/qplatformintegration.h>
 
+#include <algorithm>
+
 // FIXME This workaround can be removed for xcb-icccm > 3.8
 #define class class_name
 #include <xcb/xcb_icccm.h>
@@ -152,9 +154,9 @@ enum QX11EmbedMessageType {
     XEMBED_ACTIVATE_ACCELERATOR = 14
 };
 
-static unsigned int XEMBED_VERSION = 0;
+const quint32 XEMBED_VERSION = 0;
 
-// Returns true if we should set WM_TRANSIENT_FOR on \a w
+// Returns \c true if we should set WM_TRANSIENT_FOR on \a w
 static inline bool isTransient(const QWindow *w)
 {
     return w->type() == Qt::Dialog
@@ -401,7 +403,7 @@ void QXcbWindow::create()
     }
 
     // set the PID to let the WM kill the application if unresponsive
-    long pid = getpid();
+    quint32 pid = getpid();
     Q_XCB_CALL(xcb_change_property(xcb_connection(), XCB_PROP_MODE_REPLACE, m_window,
                                    atom(QXcbAtom::_NET_WM_PID), XCB_ATOM_CARDINAL, 32,
                                    1, &pid));
@@ -420,7 +422,7 @@ void QXcbWindow::create()
                                    1, &leader));
 
     /* Add XEMBED info; this operation doesn't initiate the embedding. */
-    long data[] = { XEMBED_VERSION, XEMBED_MAPPED };
+    quint32 data[] = { XEMBED_VERSION, XEMBED_MAPPED };
     Q_XCB_CALL(xcb_change_property(xcb_connection(), XCB_PROP_MODE_REPLACE, m_window,
                                    atom(QXcbAtom::_XEMBED_INFO),
                                    atom(QXcbAtom::_XEMBED_INFO),
@@ -646,7 +648,6 @@ void QXcbWindow::show()
             if (!transientXcbParent)
                 transientXcbParent = static_cast<QXcbScreen *>(screen())->clientLeader();
             if (transientXcbParent) { // ICCCM 4.1.2.6
-                m_gravity = XCB_GRAVITY_CENTER;
                 Q_XCB_CALL(xcb_change_property(xcb_connection(), XCB_PROP_MODE_REPLACE, m_window,
                                                XCB_ATOM_WM_TRANSIENT_FOR, XCB_ATOM_WINDOW, 32,
                                                1, &transientXcbParent));
@@ -779,21 +780,21 @@ QXcbWindow::NetWmStates QXcbWindow::netWmStates()
     if (reply && reply->format == 32 && reply->type == XCB_ATOM_ATOM) {
         const xcb_atom_t *states = static_cast<const xcb_atom_t *>(xcb_get_property_value(reply));
         const xcb_atom_t *statesEnd = states + reply->length;
-        if (statesEnd != qFind(states, statesEnd, atom(QXcbAtom::_NET_WM_STATE_ABOVE)))
+        if (statesEnd != std::find(states, statesEnd, atom(QXcbAtom::_NET_WM_STATE_ABOVE)))
             result |= NetWmStateAbove;
-        if (statesEnd != qFind(states, statesEnd, atom(QXcbAtom::_NET_WM_STATE_BELOW)))
+        if (statesEnd != std::find(states, statesEnd, atom(QXcbAtom::_NET_WM_STATE_BELOW)))
             result |= NetWmStateBelow;
-        if (statesEnd != qFind(states, statesEnd, atom(QXcbAtom::_NET_WM_STATE_FULLSCREEN)))
+        if (statesEnd != std::find(states, statesEnd, atom(QXcbAtom::_NET_WM_STATE_FULLSCREEN)))
             result |= NetWmStateFullScreen;
-        if (statesEnd != qFind(states, statesEnd, atom(QXcbAtom::_NET_WM_STATE_MAXIMIZED_HORZ)))
+        if (statesEnd != std::find(states, statesEnd, atom(QXcbAtom::_NET_WM_STATE_MAXIMIZED_HORZ)))
             result |= NetWmStateMaximizedHorz;
-        if (statesEnd != qFind(states, statesEnd, atom(QXcbAtom::_NET_WM_STATE_MAXIMIZED_VERT)))
+        if (statesEnd != std::find(states, statesEnd, atom(QXcbAtom::_NET_WM_STATE_MAXIMIZED_VERT)))
             result |= NetWmStateMaximizedVert;
-        if (statesEnd != qFind(states, statesEnd, atom(QXcbAtom::_NET_WM_STATE_MODAL)))
+        if (statesEnd != std::find(states, statesEnd, atom(QXcbAtom::_NET_WM_STATE_MODAL)))
             result |= NetWmStateModal;
-        if (statesEnd != qFind(states, statesEnd, atom(QXcbAtom::_NET_WM_STATE_STAYS_ON_TOP)))
+        if (statesEnd != std::find(states, statesEnd, atom(QXcbAtom::_NET_WM_STATE_STAYS_ON_TOP)))
             result |= NetWmStateStaysOnTop;
-        if (statesEnd != qFind(states, statesEnd, atom(QXcbAtom::_NET_WM_STATE_DEMANDS_ATTENTION)))
+        if (statesEnd != std::find(states, statesEnd, atom(QXcbAtom::_NET_WM_STATE_DEMANDS_ATTENTION)))
             result |= NetWmStateDemandsAttention;
         free(reply);
     } else {
@@ -1143,6 +1144,17 @@ void QXcbWindow::updateNetWmUserTime(xcb_timestamp_t timestamp)
             xcb_change_property(xcb_connection(), XCB_PROP_MODE_REPLACE, m_window, atom(QXcbAtom::_NET_WM_USER_TIME_WINDOW),
                                 XCB_ATOM_WINDOW, 32, 1, &m_netWmUserTimeWindow);
             xcb_delete_property(xcb_connection(), m_window, atom(QXcbAtom::_NET_WM_USER_TIME));
+#ifndef QT_NO_DEBUG
+            QByteArray ba("Qt NET_WM user time window");
+            Q_XCB_CALL(xcb_change_property(xcb_connection(),
+                                           XCB_PROP_MODE_REPLACE,
+                                           m_netWmUserTimeWindow,
+                                           atom(QXcbAtom::_NET_WM_NAME),
+                                           atom(QXcbAtom::UTF8_STRING),
+                                           8,
+                                           ba.length(),
+                                           ba.constData()));
+#endif
         } else if (!isSupportedByWM) {
             // WM no longer supports it, then we should remove the
             // _NET_WM_USER_TIME_WINDOW atom.
@@ -1302,9 +1314,6 @@ QRect QXcbWindow::windowToWmGeometry(QRect r) const
         r.translate(m_frameMargins.left(), m_frameMargins.top());
     } else if (!frameInclusive && m_gravity == XCB_GRAVITY_NORTH_WEST) {
         r.translate(-m_frameMargins.left(), -m_frameMargins.top());
-    } else if (!frameInclusive && m_gravity == XCB_GRAVITY_CENTER) {
-        r.translate(-(m_frameMargins.left() - m_frameMargins.right())/2,
-                    -(m_frameMargins.top() - m_frameMargins.bottom())/2);
     }
     return r;
 }
@@ -1502,6 +1511,9 @@ void QXcbWindow::handleClientMessageEvent(const xcb_client_message_event_t *even
         } else if (event->data.data32[0] == atom(QXcbAtom::WM_TAKE_FOCUS)) {
             connection()->setTime(event->data.data32[1]);
         } else if (event->data.data32[0] == atom(QXcbAtom::_NET_WM_PING)) {
+            if (event->window == m_screen->root())
+                return;
+
             xcb_client_message_event_t reply = *event;
 
             reply.response_type = XCB_CLIENT_MESSAGE;
@@ -1515,8 +1527,7 @@ void QXcbWindow::handleClientMessageEvent(const xcb_client_message_event_t *even
             m_syncValue.hi = event->data.data32[3];
 #ifndef QT_NO_WHATSTHIS
         } else if (event->data.data32[0] == atom(QXcbAtom::_NET_WM_CONTEXT_HELP)) {
-            QEvent *e = new QEvent(QEvent::EnterWhatsThisMode);
-            QGuiApplication::postEvent(QGuiApplication::instance(), e);
+            QWindowSystemInterface::handleEnterWhatsThisEvent();
 #endif
         } else {
             qWarning() << "QXcbWindow: Unhandled WM_PROTOCOLS message:" << connection()->atomName(event->data.data32[0]);
@@ -1533,6 +1544,18 @@ void QXcbWindow::handleClientMessageEvent(const xcb_client_message_event_t *even
 #endif
     } else if (event->type == atom(QXcbAtom::_XEMBED)) {
         handleXEmbedMessage(event);
+    } else if (event->type == atom(QXcbAtom::_NET_ACTIVE_WINDOW)) {
+        connection()->setFocusWindow(this);
+        QWindowSystemInterface::handleWindowActivated(window());
+    } else if (event->type == atom(QXcbAtom::MANAGER)
+               || event->type == atom(QXcbAtom::_NET_WM_STATE)
+               || event->type == atom(QXcbAtom::WM_CHANGE_STATE)) {
+        // Ignore _NET_WM_STATE, MANAGER which are relate to tray icons
+        // and other messages.
+    } else if (event->type == atom(QXcbAtom::_COMPIZ_DECOR_PENDING)
+            || event->type == atom(QXcbAtom::_COMPIZ_DECOR_REQUEST)
+            || event->type == atom(QXcbAtom::_COMPIZ_DECOR_DELETE_PIXMAP)) {
+        //silence the _COMPIZ messages for now
     } else {
         qWarning() << "QXcbWindow: Unhandled client message:" << connection()->atomName(event->type);
     }
@@ -1801,7 +1824,7 @@ void QXcbWindow::handlePropertyNotifyEvent(const xcb_property_notify_event_t *ev
                 xcb_get_property_reply(xcb_connection(), get_cookie, NULL);
 
             if (reply && reply->format == 32 && reply->type == wmStateAtom) {
-                const long *data = (const long *)xcb_get_property_value(reply);
+                const quint32 *data = (const quint32 *)xcb_get_property_value(reply);
                 if (reply->length != 0 && XCB_WM_STATE_ICONIC == data[0])
                     newState = Qt::WindowMinimized;
             }
@@ -1972,8 +1995,8 @@ bool QXcbWindow::startSystemResize(const QPoint &pos, Qt::Corner corner)
 }
 
 // Sends an XEmbed message.
-void QXcbWindow::sendXEmbedMessage(xcb_window_t window, long message,
-                                   long detail, long data1, long data2)
+void QXcbWindow::sendXEmbedMessage(xcb_window_t window, quint32 message,
+                                   quint32 detail, quint32 data1, quint32 data2)
 {
     xcb_client_message_event_t event;
 

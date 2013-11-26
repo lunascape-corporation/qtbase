@@ -275,13 +275,10 @@ QList<QJsonObject> QFactoryLoader::metaData() const
     for (int i = 0; i < d->libraryList.size(); ++i)
         metaData.append(d->libraryList.at(i)->metaData);
 
-    QVector<QStaticPlugin> staticPlugins = QLibraryPrivate::staticPlugins();
-    for (int i = 0; i < staticPlugins.count(); ++i) {
-        const char *rawMetaData = staticPlugins.at(i).metaData();
-        QJsonObject object = QLibraryPrivate::fromRawMetaData(rawMetaData).object();
+    foreach (const QStaticPlugin &plugin, QPluginLoader::staticPlugins()) {
+        const QJsonObject object = plugin.metaData();
         if (object.value(QLatin1String("IID")) != QLatin1String(d->iid.constData(), d->iid.size()))
             continue;
-
         metaData.append(object);
     }
     return metaData;
@@ -309,10 +306,9 @@ QObject *QFactoryLoader::instance(int index) const
     }
 
     index -= d->libraryList.size();
-    QVector<QStaticPlugin> staticPlugins = QLibraryPrivate::staticPlugins();
+    QVector<QStaticPlugin> staticPlugins = QPluginLoader::staticPlugins();
     for (int i = 0; i < staticPlugins.count(); ++i) {
-        const char *rawMetaData = staticPlugins.at(i).metaData();
-        QJsonObject object = QLibraryPrivate::fromRawMetaData(rawMetaData).object();
+        const QJsonObject object = staticPlugins.at(i).metaData();
         if (object.value(QLatin1String("IID")) != QLatin1String(d->iid.constData(), d->iid.size()))
             continue;
 

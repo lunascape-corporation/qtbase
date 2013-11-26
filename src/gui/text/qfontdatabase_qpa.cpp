@@ -52,11 +52,11 @@
 
 QT_BEGIN_NAMESPACE
 
-Q_GUI_EXPORT  void qt_registerFont(const QString &familyName, const QString &stylename,
-                                   const QString &foundryname, int weight,
-                                   QFont::Style style, int stretch, bool antialiased,
-                                   bool scalable, int pixelSize, bool fixedPitch,
-                                   const QSupportedWritingSystems &writingSystems, void *handle)
+void qt_registerFont(const QString &familyName, const QString &stylename,
+                     const QString &foundryname, int weight,
+                     QFont::Style style, int stretch, bool antialiased,
+                     bool scalable, int pixelSize, bool fixedPitch,
+                     const QSupportedWritingSystems &writingSystems, void *handle)
 {
     QFontDatabasePrivate *d = privateDb();
 //    qDebug() << "Adding font" << familyName << weight << style << pixelSize << antialiased;
@@ -85,7 +85,7 @@ Q_GUI_EXPORT  void qt_registerFont(const QString &familyName, const QString &sty
     size->handle = handle;
 }
 
-Q_GUI_EXPORT void qt_registerAliasToFontFamily(const QString &familyName, const QString &alias)
+void qt_registerAliasToFontFamily(const QString &familyName, const QString &alias)
 {
     if (alias.isEmpty())
         return;
@@ -184,6 +184,7 @@ QFontEngine *loadSingleEngine(int script,
     if (!engine) {
         engine = pfdb->fontEngine(def, QChar::Script(script), size->handle);
         if (engine) {
+            engine->smoothScalable = style->smoothScalable;
             QFontCache::Key key(def,script);
             QFontCache::instance()->instance()->insertEngine(key,engine);
         }
@@ -267,6 +268,7 @@ bool QFontDatabase::removeAllApplicationFonts()
     return true;
 }
 
+// QT_DEPRECATED_SINCE(5, 2)
 bool QFontDatabase::supportsThreadedFontRendering()
 {
     return true;

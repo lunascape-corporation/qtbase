@@ -52,12 +52,17 @@ class QIOSWindow;
 
 @interface UIView (QIOS)
 @property(readonly) QWindow *qwindow;
+@property(readonly) UIViewController *viewController;
 @end
 
 QT_BEGIN_NAMESPACE
 
-class QIOSWindow : public QPlatformWindow
+@class QUIView;
+
+class QIOSWindow : public QObject, public QPlatformWindow
 {
+    Q_OBJECT
+
 public:
     explicit QIOSWindow(QWindow *window);
     ~QIOSWindow();
@@ -74,8 +79,6 @@ public:
     void requestActivateWindow();
 
     qreal devicePixelRatio() const;
-    int effectiveWidth() const;
-    int effectiveHeight() const;
 
     bool setMouseGrabEnabled(bool grab) { return grab; }
     bool setKeyboardGrabEnabled(bool grab) { return grab; }
@@ -83,11 +86,10 @@ public:
     WId winId() const { return WId(m_view); };
 
 private:
-    UIView *m_view;
+    QUIView *m_view;
 
-    QRect m_requestedGeometry;
+    QRect m_normalGeometry;
     int m_windowLevel;
-    qreal m_devicePixelRatio;
 
     void raiseOrLower(bool raise);
     void updateWindowLevel();

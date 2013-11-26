@@ -49,15 +49,16 @@
 /*
    The operating system, must be one of: (Q_OS_x)
 
-     DARWIN   - Darwin OS (synonym for Q_OS_MAC)
-     MAC      - OS X or iOS (synonym for Q_OS_DARWIN)
-     MACX     - OS X
+     DARWIN   - Any Darwin system
+     MAC      - OS X and iOS
+     OSX      - OS X
      IOS      - iOS
      MSDOS    - MS-DOS and Windows
      OS2      - OS/2
      OS2EMX   - XFree86 on OS/2 (not PM)
      WIN32    - Win32 (Windows 2000/XP/Vista/7 and Windows Server 2003/2008)
      WINCE    - WinCE (Windows CE 5.0)
+     WINRT    - WinRT (Windows 8 Runtime)
      CYGWIN   - Cygwin
      SOLARIS  - Sun Solaris
      HPUX     - HP-UX
@@ -105,12 +106,21 @@
 #  define Q_OS_LINUX
 #elif defined(__CYGWIN__)
 #  define Q_OS_CYGWIN
-#elif !defined(SAG_COM) && (defined(WIN64) || defined(_WIN64) || defined(__WIN64__))
+#elif !defined(SAG_COM) && (!defined(WINAPI_FAMILY) || WINAPI_FAMILY==WINAPI_FAMILY_DESKTOP_APP) && (defined(WIN64) || defined(_WIN64) || defined(__WIN64__))
 #  define Q_OS_WIN32
 #  define Q_OS_WIN64
 #elif !defined(SAG_COM) && (defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__))
 #  if defined(WINCE) || defined(_WIN32_WCE)
 #    define Q_OS_WINCE
+#  elif defined(WINAPI_FAMILY)
+#    if WINAPI_FAMILY==WINAPI_FAMILY_PHONE_APP
+#      define Q_OS_WINPHONE
+#      define Q_OS_WINRT
+#    elif WINAPI_FAMILY==WINAPI_FAMILY_APP
+#      define Q_OS_WINRT
+#    else
+#      define Q_OS_WIN32
+#    endif
 #  else
 #    define Q_OS_WIN32
 #  endif
@@ -172,7 +182,7 @@
 #  error "Qt has not been ported to this OS - see http://www.qt-project.org/"
 #endif
 
-#if defined(Q_OS_WIN32) || defined(Q_OS_WIN64) || defined(Q_OS_WINCE)
+#if defined(Q_OS_WIN32) || defined(Q_OS_WIN64) || defined(Q_OS_WINCE) || defined(Q_OS_WINRT)
 #  define Q_OS_WIN
 #endif
 
@@ -186,8 +196,9 @@
 #  include <TargetConditionals.h>
 #  if defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
 #     define Q_OS_IOS
-#  else
-#     define Q_OS_MACX
+#  elif defined(TARGET_OS_MAC) && TARGET_OS_MAC
+#     define Q_OS_OSX
+#     define Q_OS_MACX // compatibility synonym
 #  endif
 #endif
 

@@ -48,24 +48,11 @@
 
 @implementation QIOSViewController
 
-- (void)viewDidLoad
-{
-#ifdef QT_DEBUG
-    if (!self.nibName)
-        self.view.backgroundColor = [UIColor magentaColor];
-#endif
-}
-
 -(BOOL)shouldAutorotate
 {
-    // For now we assume that if the application doesn't listen to orientation
-    // updates it means it would like to enable auto-rotation, and vice versa.
-    if (QGuiApplication *guiApp = qobject_cast<QGuiApplication *>(qApp))
-        return !guiApp->primaryScreen()->orientationUpdateMask();
-    else
-        return YES; // Startup case: QGuiApplication is not ready yet.
-
-    // FIXME: Investigate a proper Qt API for auto-rotation and orientation locking
+    // Until a proper orientation and rotation API is in place, we always auto rotate.
+    // If auto rotation is not wanted, you would need to switch it off manually from Info.plist.
+    return YES;
 }
 
 -(NSUInteger)supportedInterfaceOrientations
@@ -75,19 +62,16 @@
     return UIInterfaceOrientationMaskAll;
 }
 
-- (void)willRotateToInterfaceOrientation:(UIInterfaceOrientation)toInterfaceOrientation duration:(NSTimeInterval)duration
+- (void)willAnimateRotationToInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation duration:(NSTimeInterval)duration
 {
     Q_UNUSED(duration);
+    Q_UNUSED(interfaceOrientation);
 
     if (!QCoreApplication::instance())
         return; // FIXME: Store orientation for later (?)
 
-    Qt::ScreenOrientation orientation = toQtScreenOrientation(UIDeviceOrientation(toInterfaceOrientation));
-    if (orientation == -1)
-        return;
-
     QIOSScreen *qiosScreen = static_cast<QIOSScreen *>(QGuiApplication::primaryScreen()->handle());
-    qiosScreen->setPrimaryOrientation(orientation);
+    qiosScreen->updateProperties();
 }
 
 @end

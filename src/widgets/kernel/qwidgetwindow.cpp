@@ -49,6 +49,7 @@
 #endif
 #include <private/qwidgetbackingstore_p.h>
 #include <qpa/qwindowsysteminterface_p.h>
+#include <private/qgesturemanager_p.h>
 
 QT_BEGIN_NAMESPACE
 
@@ -75,6 +76,13 @@ public:
         }
         return w;
     }
+
+    void clearFocusObject()
+    {
+        if (QApplicationPrivate::focus_widget)
+            QApplicationPrivate::focus_widget->clearFocus();
+    }
+
 };
 
 QWidgetWindow::QWidgetWindow(QWidget *widget)
@@ -83,6 +91,12 @@ QWidgetWindow::QWidgetWindow(QWidget *widget)
 {
     updateObjectName();
     connect(m_widget, &QObject::objectNameChanged, this, &QWidgetWindow::updateObjectName);
+}
+
+QWidgetWindow::~QWidgetWindow()
+{
+    if (m_widget == qt_tablet_target)
+        qt_tablet_target = 0;
 }
 
 #ifndef QT_NO_ACCESSIBILITY
@@ -220,6 +234,13 @@ bool QWidgetWindow::event(QEvent *event)
         handleTabletEvent(static_cast<QTabletEvent *>(event));
         return true;
 #endif
+
+#ifndef QT_NO_GESTURES
+    case QEvent::NativeGesture:
+        handleGestureEvent(static_cast<QNativeGestureEvent *>(event));
+        return true;
+#endif
+
 #ifndef QT_NO_CONTEXTMENU
     case QEvent::ContextMenu:
         handleContextMenuEvent(static_cast<QContextMenuEvent *>(event));
@@ -230,7 +251,9 @@ bool QWidgetWindow::event(QEvent *event)
     case QEvent::Show:
     case QEvent::Hide:
         return QWindow::event(event);
-
+    case QEvent::WindowBlocked:
+        qt_button_down = 0;
+        break;
     default:
         break;
     }
@@ -559,7 +582,7 @@ void QWidgetWindow::handleWheelEvent(QWheelEvent *event)
 
     QPoint mapped = widget->mapFrom(m_widget, event->pos());
 
-    QWheelEvent translated(mapped, event->globalPos(), event->pixelDelta(), event->angleDelta(), event->delta(), event->orientation(), event->buttons(), event->modifiers());
+    QWheelEvent translated(mapped, event->globalPos(), event->pixelDelta(), event->angleDelta(), event->delta(), event->orientation(), event->buttons(), event->modifiers(), event->phase());
     QGuiApplication::sendSpontaneousEvent(widget, &translated);
 }
 
@@ -692,6 +715,10 @@ void QWidgetWindow::handleWindowStateChangedEvent(QWindowStateChangeEvent *event
         break;
     }
 
+    // Note that widgetState == m_widget->data->window_state when triggered by QWidget::setWindowState().
+    if (!(widgetState & Qt::WindowMinimized))
+        m_widget->setAttribute(Qt::WA_Mapped);
+
     // Sent event if the state changed (that is, it is not triggered by
     // QWidget::setWindowState(), which also sends an event to the widget).
     if (widgetState != int(m_widget->data->window_state)) {
@@ -731,6 +758,25 @@ void QWidgetWindow::handleTabletEvent(QTabletEvent *event)
         qt_tablet_target = 0;
 }
 #endif // QT_NO_TABLETEVENT
+
+#ifndef QT_NO_GESTURES
+void QWidgetWindow::handleGestureEvent(QNativeGestureEvent *e)
+{
+    // copy-pasted code to find correct widget follows:
+    QObject *receiver = 0;
+    if (QApplicationPrivate::inPopupMode()) {
+        QWidget *popup = QApplication::activePopupWidget();
+        QWidget *popupFocusWidget = popup->focusWidget();
+        receiver = popupFocusWidget ? popupFocusWidget : popup;
+    }
+    if (!receiver)
+        receiver = QApplication::widgetAt(e->globalPos());
+    if (!receiver)
+        receiver = m_widget; // last resort
+
+    QApplication::sendSpontaneousEvent(receiver, e);
+}
+#endif // QT_NO_GESTURES
 
 #ifndef QT_NO_CONTEXTMENU
 void QWidgetWindow::handleContextMenuEvent(QContextMenuEvent *e)

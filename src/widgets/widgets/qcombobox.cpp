@@ -407,7 +407,7 @@ void QComboBoxPrivateContainer::leaveEvent(QEvent *)
 }
 
 QComboBoxPrivateContainer::QComboBoxPrivateContainer(QAbstractItemView *itemView, QComboBox *parent)
-    : QFrame(parent, Qt::Popup), combo(parent), view(0), top(0), bottom(0)
+    : QFrame(parent, Qt::Popup), combo(parent), view(0), top(0), bottom(0), maybeIgnoreMouseButtonRelease(false)
 {
     // we need the combobox and itemview
     Q_ASSERT(parent);
@@ -667,10 +667,15 @@ bool QComboBoxPrivateContainer::eventFilter(QObject *o, QEvent *e)
             }
         }
         break;
+    case QEvent::MouseButtonPress:
+        maybeIgnoreMouseButtonRelease = false;
+        break;
     case QEvent::MouseButtonRelease: {
+        bool ignoreEvent = maybeIgnoreMouseButtonRelease && popupTimer.elapsed() < QApplication::doubleClickInterval();
+
         QMouseEvent *m = static_cast<QMouseEvent *>(e);
         if (isVisible() && view->rect().contains(m->pos()) && view->currentIndex().isValid()
-            && !blockMouseReleaseTimer.isActive()
+            && !blockMouseReleaseTimer.isActive() && !ignoreEvent
             && (view->currentIndex().flags() & Qt::ItemIsEnabled)
             && (view->currentIndex().flags() & Qt::ItemIsSelectable)) {
             combo->hidePopup();
@@ -1374,7 +1379,7 @@ int QComboBox::maxCount() const
 
     Use setCompleter() instead.
 
-    By default, this property is true.
+    By default, this property is \c true.
 
     \sa editable
 */
@@ -1468,7 +1473,7 @@ void QComboBox::setAutoCompletionCaseSensitivity(Qt::CaseSensitivity sensitivity
     Note that it is always possible to programmatically insert duplicate items into the
     combobox.
 
-    By default, this property is false (duplicates are not allowed).
+    By default, this property is \c false (duplicates are not allowed).
 */
 bool QComboBox::duplicatesEnabled() const
 {
@@ -1627,7 +1632,7 @@ void QComboBox::setIconSize(const QSize &size)
     \property QComboBox::editable
     \brief whether the combo box can be edited by the user
 
-    By default, this property is false. The effect of editing depends
+    By default, this property is \c false. The effect of editing depends
     on the insert policy.
 
     \sa InsertPolicy
@@ -2083,6 +2088,20 @@ QString QComboBox::currentText() const
         return d->itemText(d->currentIndex);
     else
         return QString();
+}
+
+/*!
+    \property QComboBox::currentData
+    \brief the data for the current item
+    \since 5.2
+
+    By default, for an empty combo box or a combo box in which no current
+    item is set, this property contains an invalid QVariant.
+*/
+QVariant QComboBox::currentData(int role) const
+{
+    Q_D(const QComboBox);
+    return d->currentIndex.data(role);
 }
 
 /*!
@@ -2548,6 +2567,7 @@ void QComboBox::showPopup()
     container->setUpdatesEnabled(false);
 #endif
 
+    bool startTimer = !container->isVisible();
     container->raise();
     container->show();
     container->updateScrollers();
@@ -2567,6 +2587,10 @@ void QComboBox::showPopup()
     if (QApplication::keypadNavigationEnabled())
         view()->setEditFocus(true);
 #endif
+    if (startTimer) {
+        container->popupTimer.start();
+        container->maybeIgnoreMouseButtonRelease = true;
+    }
 }
 
 /*!
@@ -2862,6 +2886,11 @@ void QComboBox::mousePressEvent(QMouseEvent *e)
         }
 #endif
         showPopup();
+        // The code below ensures that regular mousepress and pick item still works
+        // If it was not called the viewContainer would ignore event since it didn't have
+        // a mousePressEvent first.
+        if (d->viewContainer())
+            d->viewContainer()->maybeIgnoreMouseButtonRelease = false;
     } else {
 #ifdef QT_KEYPAD_NAVIGATION
         if (QApplication::keypadNavigationEnabled() && sc == QStyle::SC_ComboBoxEditField && d->lineEdit) {

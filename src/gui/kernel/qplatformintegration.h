@@ -74,6 +74,7 @@ class QPlatformTheme;
 class QPlatformDialogHelper;
 class QPlatformSharedGraphicsCache;
 class QPlatformServices;
+class QPlatformSessionManager;
 class QKeyEvent;
 class QPlatformOffscreenSurface;
 class QOffscreenSurface;
@@ -91,7 +92,10 @@ public:
         MultipleWindows,
         ApplicationState,
         ForeignWindows,
-        NonFullScreenWindows
+        NonFullScreenWindows,
+        NativeWidgets,
+        WindowManagement,
+        SyncState
     };
 
     virtual ~QPlatformIntegration() { }
@@ -108,7 +112,8 @@ public:
     virtual QPaintEngine *createImagePaintEngine(QPaintDevice *paintDevice) const;
 
 // Event dispatcher:
-    virtual QAbstractEventDispatcher *guiThreadEventDispatcher() const = 0;
+    virtual QAbstractEventDispatcher *createEventDispatcher() const = 0;
+    virtual void initialize();
 
 //Deeper window system integrations
     virtual QPlatformFontDatabase *fontDatabase() const;
@@ -141,7 +146,9 @@ public:
         StartDragVelocity,
         UseRtlExtensions,
         SynthesizeMouseFromTouchEvents,
-        PasswordMaskCharacter
+        PasswordMaskCharacter,
+        SetFocusOnTouchRelease,
+        ShowIsMaximized
     };
 
     virtual QVariant styleHint(StyleHint hint) const;
@@ -154,6 +161,11 @@ public:
 
     virtual QPlatformOffscreenSurface *createPlatformOffscreenSurface(QOffscreenSurface *surface) const;
 
+#ifndef QT_NO_SESSIONMANAGER
+    virtual QPlatformSessionManager *createPlatformSessionManager(const QString &id, const QString &key) const;
+#endif
+
+    virtual void sync();
 protected:
     void screenAdded(QPlatformScreen *screen);
 };

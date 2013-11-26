@@ -39,58 +39,35 @@
 **
 ****************************************************************************/
 
-#import "qiosapplicationdelegate.h"
+#include "qiosapplicationdelegate.h"
+
+#include "qiosviewcontroller.h"
 #include "qioswindow.h"
+
 #include <QtCore/QtCore>
 
 @implementation QIOSApplicationDelegate
 
 @synthesize window;
-@synthesize qiosViewController;
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
-    Q_UNUSED(application)
-    Q_UNUSED(launchOptions)
+    Q_UNUSED(application);
+    Q_UNUSED(launchOptions);
+
+    self.window = [[[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]] autorelease];
+    self.window.rootViewController = [[[QIOSViewController alloc] init] autorelease];
+
+    self.window.hidden = NO;
 
     return YES;
 }
 
-- (void)applicationWillResignActive:(UIApplication *)application
-{
-    Q_UNUSED(application)
-}
-
-- (void)applicationDidEnterBackground:(UIApplication *)application
-{
-    Q_UNUSED(application)
-}
-
-- (void)applicationWillEnterForeground:(UIApplication *)application
-{
-    Q_UNUSED(application)
-    // Called as part of the transition from the background to the inactive state; here you can undo many of the changes made on entering the background.
-}
-
-- (void)applicationDidBecomeActive:(UIApplication *)application
-{
-    Q_UNUSED(application)
-    // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
-}
-
-- (void)applicationWillTerminate:(UIApplication *)application
-{
-    Q_UNUSED(application)
-    // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
-}
-
 - (void)dealloc
 {
-    [qiosViewController release];
     [window release];
     [super dealloc];
 }
 
 @end
-
 
